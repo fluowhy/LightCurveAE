@@ -9,6 +9,37 @@ import matplotlib.pyplot as plt
 import pdb
 
 
+def plot_confusion_matrix(cm, labels, title, savename, normalize=False, dpi=200):
+    nc = len(labels)
+    plt.clf()
+    fig, ax = plt.subplots()
+    if normalize:
+        cm = cm / cm.sum(1)
+        vmax = 1
+        my_format = "{:.2f}"
+    else:
+        vmax = cm.max()
+        my_format = "{:.0f}"
+    thr = vmax * 0.5
+    im = ax.imshow(cm, cmap="YlGn", aspect="equal", vmin=0, vmax=vmax)
+    for i in range(nc):
+        for j in range(nc):
+            if cm[i, j] > thr:
+                color = "white"
+            else:
+                color = "black"
+            text = ax.text(j, i, my_format.format(cm[i, j]), ha="center", va="center", color=color, fontsize=8)
+    plt.title(title)
+    plt.xticks(np.arange(nc), labels, rotation=45)
+    plt.yticks(np.arange(nc), labels)
+    plt.xlabel("predicted label")
+    plt.ylabel("true label")
+    fig.colorbar(im)
+    plt.tight_layout()
+    plt.savefig(savename, dpi=dpi)
+    return
+
+
 def plot_loss(loss, savename, dpi=200):
     epochs = np.arange(len(loss))
     plt.clf()

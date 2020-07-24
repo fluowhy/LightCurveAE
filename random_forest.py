@@ -2,9 +2,11 @@ import torch
 import numpy as np
 from sklearn.model_selection import RandomizedSearchCV, StratifiedKFold, GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import confusion_matrix
+from tqdm import tqdm
 import pdb
 
-from utils import seed_everything
+from utils import seed_everything, plot_confusion_matrix, load_json
 from datasets import LightCurveDataset
 from models import *
 
@@ -25,6 +27,7 @@ def feature_extraction(dataset, model, device):
 
 seed_everything()
 
+name = "linear"
 bs = 256
 device = "cpu"
 arch = "gru"
@@ -35,7 +38,7 @@ nout = 1
 nlayers = 2
 do = 0.25
 
-dataset = LightCurveDataset("linear", fold=True, bs=bs, device=device, eval=True)
+dataset = LightCurveDataset(name, fold=True, bs=bs, device=device, eval=True)
 if arch == "gru":
     model = GRUAE(nin, nh, nl, nout, nlayers, do)
 elif arch == "lstm":
@@ -53,25 +56,41 @@ val_features = np.concatenate((val_features, dataset.m_val[:, np.newaxis], datas
 y_train = dataset.y_train
 y_val = dataset.y_val
 
-skf = StratifiedKFold(n_splits=5, shuffle=True)
+k = 5
+skf = StratifiedKFold(n_splits=k, shuffle=True)
 skf.get_n_splits(train_features, y_train)
 print(skf)
 
 # distributions = dict(C=uniform(loc=0, scale=4),
 #                      penalty=['l2', 'l1'])
 
+# parameters = {
+#     "n_estimators": [50, 100, 250],
+#     "criterion": ["gini", "entropy"],
+#     "max_features": [3, 6, 12, 18],
+#     "min_samples_leaf": [1, 2, 3]
+#     }
+
 parameters = {
-    "n_estimators": [50, 100, 250],
-    "criterion": ["gini", "entropy"],
-    "max_features": [3, 6, 12, 18],
-    "min_samples_leaf": [1, 2, 3]
+    "n_estimators": [50],
+    "criterion": ["gini"],
+    "max_features": [3],
+    "min_samples_leaf": [1, 2]
     }
 
 rf = RandomForestClassifier()
-clf = GridSearchCV(rf, parameters)
+clf = GridSearchCV(rf, parameters, cv=skf, n_jobs=2)
+clf.fit(train_features, y_train)
 
-# val_idx are the validation index from k-cross validation 
-for train_idx, val_idx in skf.split(train_features, y_train):
-    clf.fit(train_features[train_idx], y_train[train_idx])
-    val_score = clf.score(train_features[val_idx], y_train[val_idx])
-    break
+lab2idx = load_json("processed_data/{}/lab2idx.json".format(name))
+labels = list(lab2idx.keys())
+y_pred = clf.predict(val_features)
+accuracy = (y_val == y_pred).sum() / len(y_val)
+cm = confusion_matrix(y_val, y_pred)
+plot_confusion_matrix(cm, labels, name, "figures/linear_{}_cm_norm.png".format(arch), normalize=True)
+plot_confusion_matrix(cm, labels, "{}, accuracy: {:.4f}".format(name, accuracy), "figures/linear_{}_cm.png".format(arch), normalize=False)
+
+idx = clf.best_index_
+mean_acc = clf.cv_results_["mean_test_score"][idx]
+std_acc = clf.cv_results_["std_test_score"][idx]
+print("{} {} {:.2f} +- {:.2f}".format(name, arch, mean_acc * 100, std_acc * 100))
