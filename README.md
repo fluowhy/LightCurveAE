@@ -1,5 +1,5 @@
 # LightCurveAE
-Reproduction of A recurrent neural network for classification of unevenly sampled variable stars
+Reproduction of *A recurrent neural network for classification of unevenly sampled variable stars* in PyTorch.
 
 | Dataset             | LINEAR        |
 |---------------------|---------------|
