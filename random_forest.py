@@ -64,18 +64,11 @@ print(skf)
 # distributions = dict(C=uniform(loc=0, scale=4),
 #                      penalty=['l2', 'l1'])
 
-# parameters = {
-#     "n_estimators": [50, 100, 250],
-#     "criterion": ["gini", "entropy"],
-#     "max_features": [3, 6, 12, 18],
-#     "min_samples_leaf": [1, 2, 3]
-#     }
-
 parameters = {
-    "n_estimators": [50],
-    "criterion": ["gini"],
-    "max_features": [3],
-    "min_samples_leaf": [1, 2]
+    "n_estimators": [50, 100, 250],
+    "criterion": ["gini", "entropy"],
+    "max_features": [3, 6, 12, 18],
+    "min_samples_leaf": [1, 2, 3]
     }
 
 rf = RandomForestClassifier()
@@ -93,4 +86,4 @@ plot_confusion_matrix(cm, labels, "{}, accuracy: {:.4f}".format(name, accuracy),
 idx = clf.best_index_
 mean_acc = clf.cv_results_["mean_test_score"][idx]
 std_acc = clf.cv_results_["std_test_score"][idx]
-print("{} {} {:.2f} +- {:.2f}".format(name, arch, mean_acc * 100, std_acc * 100))
+print("{} {} k-FCV accuracy: {:.2f} +- {:.2f}".format(name, arch, mean_acc * 100, std_acc * 100))
