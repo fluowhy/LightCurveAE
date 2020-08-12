@@ -16,17 +16,15 @@ class LSTMAE(torch.nn.Module):
         self.fce = torch.nn.Linear(nh, nl)
         self.do = torch.nn.Dropout(p=do)
 
-    def forward(self, x, seq_len):
-        n, _, _ = x.shape
-        z = self.encode(x)
-        z = z[torch.arange(n), (seq_len - 1).type(dtype=torch.long)]
+    def forward(self, x, seq_len):        
+        z = self.encode(x, seq_len)
         pred = self.decode(x[:, :, 0], z)  # index: 0-time, 1-flux, 2-flux_err
         return pred, z
 
-    def encode(self, x):
-        # input (batch, seq_len, input_size)
-        # output  (batch, seq_len, num_directions * hidden_size)
+    def encode(self, x, seq_len):
+        n, _, _ = x.shape
         x, (_, _) = self.enc(x)
+        x = x[torch.arange(n), (seq_len - 1).type(dtype=torch.long)]
         x = self.fce(x)
         return x
 
@@ -57,17 +55,15 @@ class GRUAE(torch.nn.Module):
         self.fce = torch.nn.Linear(nh, nl)
         self.do = torch.nn.Dropout(p=do)
 
-    def forward(self, x, seq_len):
-        n, _, _ = x.shape
-        z = self.encode(x)
-        z = z[torch.arange(n), (seq_len - 1).type(dtype=torch.long)]
+    def forward(self, x, seq_len):        
+        z = self.encode(x, seq_len)        
         pred = self.decode(x[:, :, 0], z)  # index: 0-time, 1-flux, 2-flux_err
         return pred, z
 
-    def encode(self, x):
-        # input (batch, seq_len, input_size)
-        # output  (batch, seq_len, num_directions * hidden_size)
+    def encode(self, x, seq_len):
+        n, _, _ = x.shape
         x, _ = self.enc(x)
+        x = x[torch.arange(n), (seq_len - 1).type(dtype=torch.long)]
         x = self.fce(x)
         return x
 

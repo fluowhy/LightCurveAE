@@ -70,14 +70,23 @@ def make_dir(directory):
 
 
 class WMSELoss(torch.nn.Module):
-    def __init__(self, eps=1e-10):
+    def __init__(self, eps=1e-10, nc=3):
         super(WMSELoss, self).__init__()
         self.eps = eps
+        self.loss_fun = self.wmse_3c if nc == 3 else self.wmse_2c
 
-    def forward(self, x, x_pred, seq_len):
-        # x_pred -> (mu, logvar)
+    def wmse_3c(self, x, x_pred, seq_len):
         mask = (x[:, :, 2] != 0) * 1.
         wmse = (((x_pred - x[:, :, 1]) / (x[:, :, 2] + self.eps)).pow(2) * mask).sum(dim=- 1) / seq_len
+        return wmse
+
+    def wmse_2c(self, x, x_pred, seq_len):
+        mask = (x[:, :, 0] != 0) * 1.
+        wmse = ((x_pred - x[:, :, 1]).pow(2) * mask).sum(dim=- 1) / seq_len
+        return wmse
+
+    def forward(self, x, x_pred, seq_len):
+        wmse = self.loss_fun(x, x_pred, seq_len)
         return wmse
 
 

@@ -67,7 +67,7 @@ class Model(object):
             if val_loss < self.best_loss:
                 self.best_model = self.model.state_dict()
                 self.best_loss = val_loss
-        torch.save(self.best_model, "models/{}.pth".format(self.args.arch))
+        torch.save(self.best_model, "models/{}/{}.pth".format(self.args.name, self.args.arch))
         return loss
 
 
@@ -84,12 +84,13 @@ if __name__ == "__main__":
     parser.add_argument("--do", type=float, default=0., help="dropout value (default 0)")
     parser.add_argument("--wd", type=float, default=0., help="L2 reg value (default 0)")
     parser.add_argument("--arch", type=str, default="gru", choices=["gru", "lstm"], help="rnn architecture (default gru)")
+    parser.add_argument("--name", type=str, default="linear", choices=["linear", "macho", "asas"], help="dataset name (default linear)")
     args = parser.parse_args()
     print(args)
 
     seed_everything()
 
-    dataset = LightCurveDataset("linear", fold=True, bs=args.bs, device=args.d, eval=True)  
+    dataset = LightCurveDataset(args.name, fold=True, bs=args.bs, device=args.d, eval=True)  
     args.nin = dataset.x_train.shape[2]
 
     autoencoder = Model(args)
