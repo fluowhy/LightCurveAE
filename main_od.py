@@ -6,7 +6,7 @@ from sklearn import metrics
 
 from models import *
 from utils import *
-# from datasets import LightCurveDataset
+from datasets import ASASSNDataset
 from toy_dataset import ToyDataset
 
 
@@ -164,7 +164,8 @@ if __name__ == "__main__":
     parser.add_argument("--do", type=float, default=0., help="dropout value (default 0)")
     parser.add_argument("--wd", type=float, default=0., help="L2 reg value (default 0)")
     parser.add_argument("--arch", type=str, default="gru", choices=["gru", "lstm"], help="rnn architecture (default gru)")
-    parser.add_argument("--name", type=str, default="linear", choices=["linear", "macho", "asas", "toy"], help="dataset name (default linear)")
+    parser.add_argument("--name", type=str, default="linear", choices=["linear", "macho", "asas_sn", "toy"], help="dataset name (default linear)")
+    parser.add_argument("--fold", action="store_true", help="folded light curves")
     args = parser.parse_args()
     print(args)
 
@@ -182,20 +183,27 @@ if __name__ == "__main__":
     make_dir("files/od/{}".format(args.name))
     make_dir("models/od/{}".format(args.name))
 
+    make_dir("figures/od/{}/fold_{}".format(args.name, args.fold))
+    make_dir("files/od/{}/fold_{}".format(args.name, args.fold))
+    make_dir("models/od/{}/fold_{}".format(args.name, args.fold))
+
 
     # dataset = LightCurveDataset(args.name, fold=True, bs=args.bs, device=args.d, eval=True)
     if args.name == "toy":
         dataset = ToyDataset(args, val_size=0.1, sl=64)
         outlier_class = [3, 4]
+    if args.name == "asas_sn":
+        dataset = ASASSNDataset(fold=args.fold, bs=args.bs, device=args.d, eval=True)
+        outlier_class = [8]
     args.nin = dataset.x_train.shape[2]
 
     autoencoder = Model(args)
     loss, best_model, last_model = autoencoder.fit(dataset.train_dataloader, dataset.val_dataloader, args)
-    torch.save(best_model, "models/od/{}/{}_best.pth".format(args.name, args.arch))
-    torch.save(last_model, "models/od/{}/{}_last.pth".format(args.name, args.arch))
+    torch.save(best_model, "models/od/{}/fold_{}/{}_best.pth".format(args.name, args.fold, args.arch))
+    torch.save(last_model, "models/od/{}/fold_{}/{}_last.pth".format(args.name, args.fold, args.arch))
     autoencoder.evaluate(dataset, outlier_class)
-    plot_loss(loss, "figures/od/{}/{}_loss.png".format(args.name, args.arch))
-    autoencoder.plot_precision_recall("figures/od/{}/{}_precision_recall.png".format(args.name, args.arch))
-    autoencoder.plot_roc("figures/od/{}/{}_roc.png".format(args.name, args.arch))
-    autoencoder.plot_scores("figures/od/{}/{}_score.png".format(args.name, args.arch), nbins=50)
-
+    plot_loss(loss, "figures/od/{}/fold_{}/{}_loss.png".format(args.name,args.fold, args.arch))
+    autoencoder.plot_precision_recall("figures/od/{}/fold_{}/{}_precision_recall.png".format(args.name,args.fold, args.arch))
+    autoencoder.plot_roc("figures/od/{}/fold_{}/{}_roc.png".format(args.name, args.fold, args.arch))
+    autoencoder.plot_scores("figures/od/{}/fold_{}/{}_score.png".format(args.name, args.fold, args.arch), nbins=50)
+    

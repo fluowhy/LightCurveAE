@@ -69,6 +69,22 @@ def make_dir(directory):
     return
 
 
+class MyAugDataset(Dataset):
+    def __init__(self, x, y, m, s, z, device="cpu"):
+        self.n, _, _ = x.shape
+        self.x = torch.tensor(x, dtype=torch.float, device=device)
+        self.y = torch.tensor(y, dtype=torch.long, device=device)
+        self.m = torch.tensor(m, dtype=torch.float, device=device)
+        self.s = torch.tensor(s, dtype=torch.float, device=device)
+        self.z = torch.tensor(z, dtype=torch.float, device=device)
+
+    def __getitem__(self, index):
+        return self.x[index], self.y[index], self.m[index], self.s[index], self.z[index]
+
+    def __len__(self):
+        return self.n
+
+
 class WMSELoss(torch.nn.Module):
     def __init__(self, eps=1e-10, nc=3):
         super(WMSELoss, self).__init__()

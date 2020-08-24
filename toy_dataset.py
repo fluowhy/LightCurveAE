@@ -4,6 +4,8 @@ from torch.utils.data import Dataset, DataLoader
 import pdb
 from sklearn.model_selection import train_test_split
 
+from utils import MyAugDataset
+
 
 def read_data(seq_len=32, nclasses=3, uneven=False):
     if uneven:
@@ -95,22 +97,6 @@ def time_norm(x):
     x[:, 1:, 0] = x[:, 1:, 0] - x[:, :-1, 0]    #tmax = np.max(x[:, :, 0], axis=1)[:, np.newaxis]
     # x[:, :, 0] = x[:, :, 0] / (tmax + 1e-10)
     return x
-
-
-class MyAugDataset(Dataset):
-    def __init__(self, x, y, m, s, z, device="cpu"):
-        self.n, _, _ = x.shape
-        self.x = torch.tensor(x, dtype=torch.float, device=device)
-        self.y = torch.tensor(y, dtype=torch.long, device=device)
-        self.m = torch.tensor(m, dtype=torch.float, device=device)
-        self.s = torch.tensor(s, dtype=torch.float, device=device)
-        self.z = torch.tensor(z, dtype=torch.float, device=device)
-
-    def __getitem__(self, index):
-        return self.x[index], self.y[index], self.m[index], self.s[index], self.z[index]
-
-    def __len__(self):
-        return self.n
 
 
 class ToyDataset(object):
