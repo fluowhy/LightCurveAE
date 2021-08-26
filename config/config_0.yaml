@@ -29,4 +29,4 @@ max_lr: 0.02
 # beta_r
 beta_r: 0.98
 # beta_e
-beta_e: 1.005
+beta_e: 1.02
