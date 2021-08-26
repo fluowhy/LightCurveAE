@@ -3,7 +3,7 @@ arch: gru
 # batch size
 bs: 1024
 # training device
-d: cuda:0
+d: cuda:1
 # dropout
 do: 0.5
 # learning rate
