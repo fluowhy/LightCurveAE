@@ -208,9 +208,9 @@ if __name__ == "__main__":
     make_dir("files/od/{}".format(args.dataset))
     make_dir("models/od/{}".format(args.dataset))
 
-    make_dir("figures/od/{}/fold_{}".format(args.dataset, fold))
-    make_dir("files/od/{}/fold_{}".format(args.dataset, fold))
-    make_dir("models/od/{}/fold_{}".format(args.dataset, fold))
+    make_dir("figures/od/{}/config_{}".format(args.dataset, args.config))
+    make_dir("files/od/{}/config_{}".format(args.dataset, args.config))
+    make_dir("models/od/{}/config_{}".format(args.dataset, args.config))
 
 
     # dataset = LightCurveDataset(args.dataset, fold=True, bs=bs, device=device, eval=True)
@@ -224,11 +224,10 @@ if __name__ == "__main__":
 
     autoencoder = Model(config)
     loss, best_model, last_model = autoencoder.fit(dataset.train_dataloader, dataset.val_dataloader)
-    torch.save(best_model, "models/od/{}/fold_{}/{}_best.pth".format(args.dataset, fold, arch))
-    torch.save(last_model, "models/od/{}/fold_{}/{}_last.pth".format(args.dataset, fold, arch))
+    torch.save(best_model, "models/od/{}/config_{}/best.pth".format(args.dataset, args.config))
+    torch.save(last_model, "models/od/{}/config_{}/last.pth".format(args.dataset, args.config))
     autoencoder.evaluate(dataset, outlier_class)
-    plot_loss(loss, "figures/od/{}/fold_{}/{}_loss.png".format(args.dataset,fold, arch))
-    autoencoder.plot_precision_recall("figures/od/{}/fold_{}/{}_precision_recall.png".format(args.dataset,fold, arch))
-    autoencoder.plot_roc("figures/od/{}/fold_{}/{}_roc.png".format(args.dataset, fold, arch))
-    autoencoder.plot_scores("figures/od/{}/fold_{}/{}_score.png".format(args.dataset, fold, arch), nbins=50)
-    
+    plot_loss(loss, "figures/od/{}/config_{}/loss.png".format(args.dataset, args.config))
+    autoencoder.plot_precision_recall("figures/od/{}/config_{}/precision_recall.png".format(args.dataset, args.config))
+    autoencoder.plot_roc("figures/od/{}/config_{}/roc.png".format(args.dataset, args.config))
+    autoencoder.plot_scores("figures/od/{}/config_{}/score.png".format(args.dataset, args.config), nbins=50)
