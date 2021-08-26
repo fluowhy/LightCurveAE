@@ -3,10 +3,21 @@ from torch.utils.data import Dataset, DataLoader
 import random
 import os
 import numpy as np
-import shutil
 import json
 import matplotlib.pyplot as plt
-import pdb
+import yaml
+
+
+def save_yaml(data, savename):
+    with open(savename, 'w') as outfile:
+        yaml.dump(data, outfile, default_flow_style=False)
+    return
+
+
+def load_yaml(filename):
+    with open(filename, "r") as file:
+        data = yaml.load(file, Loader=yaml.FullLoader)
+    return data
 
 
 def plot_confusion_matrix(cm, labels, title, savename, normalize=False, dpi=200):
