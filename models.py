@@ -10,8 +10,8 @@ class LSTMAE(torch.nn.Module):
             self.enc = torch.nn.LSTM(input_size=nin, hidden_size=nh, num_layers=nlayers, dropout=do, batch_first=True)
             self.dec = torch.nn.LSTM(input_size=nl + 1, hidden_size=nh, num_layers=nlayers, dropout=do, batch_first=True)
         else:
-            self.enc = torch.nn.LSTM(input_size=nin, hidden_size=nh, num_layers=nlayers, batch_first=True)
-            self.dec = torch.nn.LSTM(input_size=nl + 1, hidden_size=nh, num_layers=nlayers, batch_first=True)
+            self.enc = torch.nn.LSTM(input_size=nin, hidden_size=nh, num_layers=nlayers, dropout=do, batch_first=True)
+            self.dec = torch.nn.LSTM(input_size=nl + 1, hidden_size=nh, num_layers=nlayers, dropout=do, batch_first=True)
         self.fcd = torch.nn.Linear(nh, nout)
         self.fce = torch.nn.Linear(nh, nl)
         self.do = torch.nn.Dropout(p=do)
