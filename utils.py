@@ -118,13 +118,15 @@ class WMSELoss(torch.nn.Module):
 
 
 class MyDataset(Dataset):
-    def __init__(self, x, z, device="cpu"):
-        self.n, _, _ = x.shape  # rnn
-        self.x = torch.tensor(x, dtype=torch.float, device=device)
-        self.z = torch.tensor(z, dtype=torch.float, device=device)
+    def __init__(self, x, y, device="cpu"):
+        self.n = len(x)
+        self.sl = [len(xi) for xi in x]
+        self.x = [torch.tensor(xi, dtype=torch.float, device=device) for xi in x]
+        self.y = y
+        self.device = device
 
     def __getitem__(self, index):
-        return self.x[index], self.z[index]
+        return self.x[index], self.y[index], self.sl[index]
 
     def __len__(self):
         return self.n

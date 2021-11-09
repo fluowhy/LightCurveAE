@@ -5,9 +5,82 @@ from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
-import pdb
+import platform
 
-from utils import make_dir, save_json, MyDataset, MyAugDataset
+from utils import make_dir
+from utils import save_json
+from utils import MyDataset
+
+
+def pad_sequence_with_lengths(data):
+    x = torch.nn.utils.rnn.pad_sequence([d[0] for d in data], padding_value=0., batch_first=True)
+    y = torch.tensor([d[1] for d in data], dtype=torch.long)
+    seq_len = torch.tensor([d[2] for d in data], dtype=torch.long)
+    return x, y, seq_len
+
+
+def apply_normalization(x):
+    normalize_time(x, offset=True)
+    normalize(x)
+    return
+
+
+def normalize_time(x, offset=False):
+    if offset:
+        for xi in x:
+            xi[:, 0] = np.log10(xi[:, 0] - xi[:, 0].min() + 1e-10)
+            xi[0, 0] = 0
+    else:
+        for xi in x:
+            xi[:, 0] = np.log10(xi[:, 0] + 1e-10)
+    return
+
+
+def normalize(x):
+    for xi in x:
+        mean = xi[:, 1].mean()
+        std = xi[:, 1].std()
+        xi[:, 1] = (xi[:, 1] - mean) / std
+        xi[:, 2] = xi[:, 2] / std
+    return
+
+
+def read_and_normalize_data(data_path):
+    x = np.load(data_path, allow_pickle=True)
+    x_train = x["x_train"]
+    x_val = x["x_val"]
+    y_train = x["y_train"]
+    y_val = x["y_val"]
+    apply_normalization(x_train)
+    apply_normalization(x_val)
+    if not (("periodic" in data_path) or ("stochastic" in data_path)):
+        x_test = x["x_test"]
+        y_test = x["y_test"]
+        apply_normalization(x_test)
+    else:
+        x_test = 0
+        y_test = 0
+    return x_train, x_val, x_test, y_train, y_val, y_test
+
+
+def load_data(device="cpu"):
+    if platform.system() == "Windows":
+        data_path = "C:/Users/mauricio/Documents/datasets/ztf/train_data_band_1.npz"
+    elif platform.system() == "Linux":
+        data_path = "/home/mromero/datasets/ztf/train_data_band_1.npz"
+    x_train, x_val, x_test, y_train, y_val, y_test = read_and_normalize_data(data_path)
+    trainset = MyDataset(x_train, y_train, device)
+    valset = MyDataset(x_val, y_val, device)
+    testset = MyDataset(x_test, y_test, device)        
+    return trainset, valset, testset
+
+
+def get_data_loaders(batch_size, device):
+    trainset, valset, testset = load_data(device)
+    trainloader = DataLoader(trainset, batch_size=int(batch_size), shuffle=True, collate_fn=pad_sequence_with_lengths)
+    valloader = DataLoader(valset, batch_size=int(batch_size), shuffle=True, collate_fn=pad_sequence_with_lengths)
+    testloader = DataLoader(testset, batch_size=int(batch_size), shuffle=False, collate_fn=pad_sequence_with_lengths)
+    return trainloader, valloader, testloader
 
 
 def phase_fold(x, p, seq_len):

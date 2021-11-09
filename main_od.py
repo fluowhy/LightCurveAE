@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from models import GRUAE
 from models import LSTMAE
 
+from utils import load_json
 from utils import load_yaml
 from utils import WMSELoss
 from utils import count_parameters
@@ -18,8 +19,7 @@ from utils import make_dir
 from utils import seed_everything
 from utils import plot_loss
 
-from datasets import ASASSNDataset
-from toy_dataset import ToyDataset
+from datasets import get_data_loaders
 
 
 def learning_rate_update(lr, max_lr, err_1, err_2, beta_r, beta_e):
@@ -54,9 +54,8 @@ class Model(object):
         train_loss = 0
         for idx, batch in tqdm(enumerate(data_loader)):
             self.optimizer.zero_grad()
-            x, y, m, s, seq_len = batch
-            # x = x.to(self.device)
-            # seq_len = seq_len.to(self.device)            
+            x, y, seq_len = batch
+            y, seq_len = y.to(self.device), seq_len.to(self.device)     
             x_pred, h = self.model(x, seq_len.long())
             loss = self.wmse(x, x_pred, seq_len).mean()
             loss.backward()
@@ -71,9 +70,8 @@ class Model(object):
         eval_loss = 0
         with torch.no_grad():
             for idx, batch in tqdm(enumerate(data_loader)):
-                x, y, m, s, seq_len = batch
-                # x = x.to(self.device)
-                # seq_len = seq_len.to(self.device)
+                x, y, seq_len = batch
+                y, seq_len = y.to(self.device), seq_len.to(self.device)
                 x_pred, h = self.model(x, seq_len.long())
                 loss = self.wmse(x, x_pred, seq_len).mean()
                 eval_loss += loss.item()
@@ -101,25 +99,25 @@ class Model(object):
         self.last_model = self.model.state_dict()
         return loss, self.best_model, self.last_model
 
-    def evaluate(self, dataset, outlier_class):
-        x = torch.tensor(dataset.x_test, dtype=torch.float, device=self.device)
-        seq_len = torch.tensor(dataset.seq_len_test, dtype=torch.float, device=self.device)
-        x_val = torch.tensor(dataset.x_val, dtype=torch.float, device=self.device)
-        seq_len_val = torch.tensor(dataset.seq_len_val, dtype=torch.float, device=self.device)
+    def evaluate(self, testset, valset, outlier_class):
+        x_test = torch.nn.utils.rnn.pad_sequence(testset.x, padding_value=0., batch_first=True)
+        seq_len = torch.tensor(testset.sl, dtype=torch.float, device=self.device)
+        x_val = torch.nn.utils.rnn.pad_sequence(valset.x, padding_value=0., batch_first=True)
+        seq_len_val = torch.tensor(valset.sl, dtype=torch.float, device=self.device)
 
         self.model.load_state_dict(self.best_model)
         self.model.eval()
         with torch.no_grad():
-            x_pred, h = self.model(x, seq_len.long())
+            x_pred, h = self.model(x_test, seq_len.long())
             x_pred_val, h_val = self.model(x_val, seq_len_val.long())
-        recon_error = self.wmse(x, x_pred, seq_len)
+        recon_error = self.wmse(x_test, x_pred, seq_len)
         recon_error_val = self.wmse(x_val, x_pred_val, seq_len_val)
         x_pred = x_pred.cpu().numpy()
         h = h.cpu().numpy()
         self.scores = recon_error.cpu().numpy()
         self.scores_val = recon_error_val.cpu().numpy()
         
-        y_test = dataset.y_test
+        y_test = np.array(testset.y)
         self.targets = np.ones(len(y_test))
         for oc in outlier_class:
             self.targets[y_test == oc] = 0
@@ -162,8 +160,8 @@ class Model(object):
         return
 
     def plot_scores(self, savename, nbins=20):
-        xmin = min(np.min(self.scores), np.min(self.scores_val))
-        xmax = max(np.max(self.scores), np.max(self.scores_val))
+        xmin = np.min(self.scores)  # , np.min(self.scores_val))
+        xmax = np.max(self.scores)  # , np.max(self.scores_val))
         bins = np.linspace(xmin, xmax, nbins)
         plt.clf()
         plt.hist(self.scores_val, bins=bins, color="black", label="val", histtype="step")
@@ -182,15 +180,17 @@ class Model(object):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="autoencoder")
     parser.add_argument('--e', type=int, default=2, help="epochs (default 2)")
-    parser.add_argument("--dataset", type=str, default="linear", choices=["linear", "macho", "asas_sn", "toy"], help="dataset name (default linear)")
+    parser.add_argument("--dataset", type=str, default="linear", choices=["linear", "macho", "asas_sn", "toy", "ztf"], help="dataset name (default linear)")
     parser.add_argument('--config', type=int, default=0, help="config number (default 0)")
+    parser.add_argument('--device', type=str, default="cpu", help="device (default cpu)")
     args = parser.parse_args()
     print(args)
 
     config = load_yaml("config/config_0.yaml")
     fold = config["fold"]
     bs = config["bs"]
-    device = config["d"]
+    device = args.device
+    config["d"] = device
     arch = config["arch"]
     config["e"] = args.e
 
@@ -217,16 +217,23 @@ if __name__ == "__main__":
     if args.dataset == "toy":
         dataset = ToyDataset(args, val_size=0.1, sl=64)
         outlier_class = [3, 4]
-    if args.dataset == "asas_sn":
+    elif args.dataset == "asas_sn":
         dataset = ASASSNDataset(fold=fold, bs=bs, device=device, eval=True)
         outlier_class = [8]
-    config["nin"] = dataset.x_train.shape[2]
+    elif args.dataset == "ztf":
+        trainloader, valloader, testloader = get_data_loaders(config["bs"], device)
+        outlier_labels = load_json("../datasets/ztf/outlier_class.json")
+        outlier_labels = [key for key in outlier_labels if outlier_labels[key] == "outlier"]
+        lab2idx = load_json("../datasets/ztf/lab2idx.json")
+        outlier_class = [int(lab2idx[lab]) for lab in outlier_labels]
+
+    config["nin"] = trainloader.dataset.x[0].shape[1]
 
     autoencoder = Model(config)
-    loss, best_model, last_model = autoencoder.fit(dataset.train_dataloader, dataset.val_dataloader)
+    loss, best_model, last_model = autoencoder.fit(trainloader, valloader)
     torch.save(best_model, "models/od/{}/config_{}/best.pth".format(args.dataset, args.config))
     torch.save(last_model, "models/od/{}/config_{}/last.pth".format(args.dataset, args.config))
-    autoencoder.evaluate(dataset, outlier_class)
+    autoencoder.evaluate(testloader.dataset, valloader.dataset, outlier_class)
     plot_loss(loss, "figures/od/{}/config_{}/loss.png".format(args.dataset, args.config))
     autoencoder.plot_precision_recall("figures/od/{}/config_{}/precision_recall.png".format(args.dataset, args.config))
     autoencoder.plot_roc("figures/od/{}/config_{}/roc.png".format(args.dataset, args.config))
