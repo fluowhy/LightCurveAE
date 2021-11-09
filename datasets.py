@@ -5,7 +5,6 @@ from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
-import platform
 
 from utils import make_dir
 from utils import save_json
@@ -51,15 +50,11 @@ def read_and_normalize_data(data_path):
     x_val = x["x_val"]
     y_train = x["y_train"]
     y_val = x["y_val"]
+    x_test = x["x_test"]
+    y_test = x["y_test"]
     apply_normalization(x_train)
     apply_normalization(x_val)
-    if not (("periodic" in data_path) or ("stochastic" in data_path)):
-        x_test = x["x_test"]
-        y_test = x["y_test"]
-        apply_normalization(x_test)
-    else:
-        x_test = 0
-        y_test = 0
+    apply_normalization(x_test)
     return x_train, x_val, x_test, y_train, y_val, y_test
 
 
@@ -81,6 +76,70 @@ def get_data_loaders(batch_size, device):
     valloader = DataLoader(valset, batch_size=int(batch_size), shuffle=True, collate_fn=pad_sequence_with_lengths)
     testloader = DataLoader(testset, batch_size=int(batch_size), shuffle=False, collate_fn=pad_sequence_with_lengths)
     return trainloader, valloader, testloader
+
+
+def get_asas_sn_data_loaders(batch_size, device):
+    trainset, valset, testset = load_asas_sn_data(device)
+    trainloader = DataLoader(trainset, batch_size=int(batch_size), shuffle=True, collate_fn=pad_sequence_with_lengths)
+    valloader = DataLoader(valset, batch_size=int(batch_size), shuffle=True, collate_fn=pad_sequence_with_lengths)
+    testloader = DataLoader(testset, batch_size=int(batch_size), shuffle=False, collate_fn=pad_sequence_with_lengths)
+    return trainloader, valloader, testloader
+
+
+def load_asas_sn_data(device="cpu"):
+    x_train, x_val, x_test, y_train, y_val, y_test = read_and_normalize_asas_sn_data()
+    trainset = MyDataset(x_train, y_train, device)
+    valset = MyDataset(x_val, y_val, device)
+    testset = MyDataset(x_test, y_test, device)        
+    return trainset, valset, testset
+
+
+def read_and_normalize_asas_sn_data():
+    asas_sn_pipeline = ASASSNPipeline()
+    x = np.load("../datasets/asas_sn/train_data.npz", allow_pickle=True)
+    x_train = x["x_train"]
+    x_val = x["x_val"]
+    x_test = x["x_test"]
+    y_train = x["y_train"]
+    y_val = x["y_val"]    
+    y_test = x["y_test"]
+    x_train = asas_sn_pipeline(x_train)
+    x_val = asas_sn_pipeline(x_val)
+    x_test = asas_sn_pipeline(x_test)
+    return x_train, x_val, x_test, y_train, y_val, y_test
+
+
+class ASASSNPipeline():
+    def __init__(self, eps=1e-10):
+        self.eps = eps
+        pass
+
+    def normalize_lc(self, x):
+        m, s = x[:, 1].mean(), x[:, 1].std()
+        x[:, 1] = (x[:, 1] - m) / (s + self.eps)
+        x[:, 2] = x[:, 2] / (s + self.eps)
+        return
+    
+    def t2dt(self, x):
+        dt = x[1:, 0] - x[:-1, 0]
+        x[1:, 0] = dt
+        x[0, 0] = 0.
+        return
+    
+    def remove_dt_0(self, x):
+        dt = x[1:, 0] - x[:-1, 0]
+        mask = dt != 0
+        mask = np.insert(mask, 0, True)
+        return x[mask]
+
+    def __call__(self, x):
+        x = [self.remove_dt_0(xi) for xi in x]
+        for xi in tqdm(x): self.normalize_lc(xi)
+        for xi in tqdm(x): self.t2dt(xi)
+        return x
+
+
+
 
 
 def phase_fold(x, p, seq_len):
@@ -396,7 +455,4 @@ class ASASSNDataset(object):
         return
 
 
-if __name__ == "__main__":
-    dataset = LightCurveDataset("linear", bs=256, fold=True, eval=True)
-    plt.errorbar(np.cumsum(dataset.x_train[0, :196, 0]), dataset.x_train[0, :196, 1], dataset.x_train[0, :196, 2], fmt=".")
-    plt.show()
+

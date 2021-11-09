@@ -20,6 +20,7 @@ from utils import seed_everything
 from utils import plot_loss
 
 from datasets import get_data_loaders
+from datasets import get_asas_sn_data_loaders
 
 
 def learning_rate_update(lr, max_lr, err_1, err_2, beta_r, beta_e):
@@ -218,7 +219,7 @@ if __name__ == "__main__":
         dataset = ToyDataset(args, val_size=0.1, sl=64)
         outlier_class = [3, 4]
     elif args.dataset == "asas_sn":
-        dataset = ASASSNDataset(fold=fold, bs=bs, device=device, eval=True)
+        trainloader, valloader, testloader = get_asas_sn_data_loaders(config["bs"], device)
         outlier_class = [8]
     elif args.dataset == "ztf":
         trainloader, valloader, testloader = get_data_loaders(config["bs"], device)
