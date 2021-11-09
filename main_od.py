@@ -230,6 +230,7 @@ if __name__ == "__main__":
 
     config["nin"] = trainloader.dataset.x[0].shape[1]
 
+    print(config)
     autoencoder = Model(config)
     loss, best_model, last_model = autoencoder.fit(trainloader, valloader)
     torch.save(best_model, "models/od/{}/config_{}/best.pth".format(args.dataset, args.config))
