@@ -6,6 +6,76 @@ import numpy as np
 import json
 import matplotlib.pyplot as plt
 import yaml
+from sklearn.metrics import precision_recall_curve
+from sklearn.metrics import roc_curve
+from sklearn.metrics import auc
+import pandas as pd
+
+
+def normalize_mag(x):
+    for xi in x:
+        m, s = xi[:, 1].mean(), xi[:, 1].std()
+        xi[:, 1] = (xi[:, 1] - m) / s
+        xi[:, 2] = xi[:, 2] / s
+    return
+
+
+def remove_time_offset(x):
+    for xi in x:
+        xi[:, 0] = xi[:, 0] -  xi[:, 0].min()
+    return
+
+
+def get_ztf_data(dataset_name):
+    family = dataset_name.split('_')[1]
+    data = np.load("../datasets/ztf/cl/{}/light_curves.npz".format(family), allow_pickle=True)["light_curves"]
+    df = pd.read_csv("../datasets/ztf/cl/{}/metadata_pro1.csv".format(family))
+    remove_time_offset(data)
+    normalize_mag(data)
+    mask = df["split2"] == "train"
+    x_train = [dat for dat, ma in zip(data, mask) if ma]
+    y_train = df["label"][mask].values
+    mask = df["split2"] == "val"
+    x_val = [dat for dat, ma in zip(data, mask) if ma]
+    y_val = df["label"][mask].values
+    mask = df["split2"] == "test"
+    x_test = [dat for dat, ma in zip(data, mask) if ma]
+    y_test = df["label"][mask].values
+    return x_train, x_val, x_test, y_train, y_val, y_test
+
+
+def od_metrics(scores, y, split=False, n_splits=None):
+    aucpr = list()
+    aucroc = list()
+    scores_in = scores[y == 1]
+    scores_out = scores[y == 0]
+    if split:
+        _, counts = np.unique(y, return_counts=True)
+        if counts[0] < counts[1]:
+            new_y = np.concatenate((np.ones(counts[0]), np.zeros(counts[0])))            
+            for i in range(n_splits):
+                new_scores = np.random.choice(scores_in, counts[0], replace=False)
+                cat_scores = np.concatenate((new_scores, scores_out))
+                precision, recall, _ = precision_recall_curve(new_y, cat_scores, pos_label=0)
+                fpr, tpr, _ = roc_curve(new_y, cat_scores, pos_label=0)
+                aucpr.append(auc(recall, precision))
+                aucroc.append(auc(fpr, tpr))
+        else:
+            new_y = np.concatenate((np.ones(counts[1]), np.zeros(counts[1])))
+            for i in range(n_splits):
+                new_scores = np.random.choice(scores_out, counts[1], replace=False)
+                cat_scores = np.concatenate((scores_in, new_scores))
+                precision, recall, _ = precision_recall_curve(new_y, cat_scores, pos_label=0)
+                fpr, tpr, _ = roc_curve(new_y, cat_scores, pos_label=0)
+                aucpr.append(auc(recall, precision))
+                aucroc.append(auc(fpr, tpr))
+        return aucpr, None, None, aucroc, None, None
+    else:
+        precision, recall, _ = precision_recall_curve(y, scores, pos_label=0)
+        fpr, tpr, _ = roc_curve(y, scores, pos_label=0)
+        aucpr = auc(recall, precision)
+        aucroc = auc(fpr, tpr)
+        return aucpr, precision, recall, aucroc, fpr, tpr
 
 
 def save_yaml(data, savename):

@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 import platform
 
-from utils import make_dir
+from utils import get_ztf_data, make_dir
 from utils import save_json
 from utils import MyDataset
 
@@ -71,16 +71,12 @@ def load_data(device="cpu"):
     return trainset, valset, testset
 
 
-def get_data_loaders(batch_size, device):
-    trainset, valset, testset = load_data(device)
-    trainloader = DataLoader(trainset, batch_size=int(batch_size), shuffle=True, collate_fn=pad_sequence_with_lengths)
-    valloader = DataLoader(valset, batch_size=int(batch_size), shuffle=True, collate_fn=pad_sequence_with_lengths)
-    testloader = DataLoader(testset, batch_size=int(batch_size), shuffle=False, collate_fn=pad_sequence_with_lengths)
-    return trainloader, valloader, testloader
-
-
-def get_asas_sn_data_loaders(batch_size, device):
-    trainset, valset, testset = load_asas_sn_data(device)
+def get_data_loaders(dataset, batch_size, device):
+    if dataset == "asas_sn":
+        pass
+    elif "ztf" in dataset:
+        x_train, x_val, x_test, y_train, y_val, y_test = get_ztf_data(dataset)
+    trainset, valset, testset = get_datasets(x_train, x_val, x_test, y_train, y_val, y_test, device)
     trainloader = DataLoader(trainset, batch_size=int(batch_size), shuffle=True, collate_fn=pad_sequence_with_lengths)
     valloader = DataLoader(valset, batch_size=int(batch_size), shuffle=True, collate_fn=pad_sequence_with_lengths)
     testloader = DataLoader(testset, batch_size=int(batch_size), shuffle=False, collate_fn=pad_sequence_with_lengths)
@@ -91,8 +87,12 @@ def load_asas_sn_data(device="cpu"):
     x_train, x_val, x_test, y_train, y_val, y_test = read_and_normalize_asas_sn_data()
     trainset = MyDataset(x_train, y_train, device)
     valset = MyDataset(x_val, y_val, device)
-    testset = MyDataset(x_test, y_test, device)        
+    testset = MyDataset(x_test, y_test, device)
     return trainset, valset, testset
+
+
+def get_datasets(x_train, x_val, x_test, y_train, y_val, y_test, device):
+    return MyDataset(x_train, y_train, device), MyDataset(x_val, y_val, device), MyDataset(x_test, y_test, device)
 
 
 def read_and_normalize_asas_sn_data():
@@ -107,6 +107,8 @@ def read_and_normalize_asas_sn_data():
     x_train = asas_sn_pipeline(x_train)
     x_val = asas_sn_pipeline(x_val)
     x_test = asas_sn_pipeline(x_test)
+    import pdb
+    pdb.set_trace()
     return x_train, x_val, x_test, y_train, y_val, y_test
 
 

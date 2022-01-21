@@ -1,7 +1,7 @@
 import argparse
 from tqdm import tqdm
-from torch.utils.tensorboard import SummaryWriter
-from sklearn import metrics
+# from torch.utils.tensorboard import SummaryWriter
+
 import torch
 import os
 import shutil
@@ -18,9 +18,10 @@ from utils import count_parameters
 from utils import make_dir
 from utils import seed_everything
 from utils import plot_loss
+from utils import od_metrics
+from utils import save_yaml
 
 from datasets import get_data_loaders
-from datasets import get_asas_sn_data_loaders
 
 
 def learning_rate_update(lr, max_lr, err_1, err_2, beta_r, beta_e):
@@ -46,7 +47,7 @@ class Model(object):
         log_path = "logs/autoencoder"
         if os.path.exists(log_path) and os.path.isdir(log_path):
             shutil.rmtree(log_path)
-        self.writer = SummaryWriter(log_path)
+        # self.writer = SummaryWriter(log_path)
         self.wmse = WMSELoss(nc=2)
         self.best_loss = np.inf
 
@@ -88,7 +89,7 @@ class Model(object):
             train_loss = self.train_model(train_loader)
             val_loss = self.eval_model(val_loader)
             loss[epoch] = (train_loss, val_loss)
-            self.writer.add_scalars("recon", {"train": train_loss, "val": val_loss}, global_step=epoch)
+            # self.writer.add_scalars("recon", {"train": train_loss, "val": val_loss}, global_step=epoch)
             print(template.format(epoch, train_loss, val_loss))
             if val_loss < self.best_loss:
                 self.best_model = self.model.state_dict()
@@ -122,13 +123,8 @@ class Model(object):
         self.targets = np.ones(len(y_test))
         for oc in outlier_class:
             self.targets[y_test == oc] = 0
-        self.average_precision = (self.targets == 0).sum() / len(self.targets)
-
-        self.precision, self.recall, _ = metrics.precision_recall_curve(self.targets, self.scores, pos_label=0)
-        self.fpr, self.tpr, _ = metrics.roc_curve(self.targets, self.scores, pos_label=0)
-
-        self.aucroc = metrics.auc(self.fpr, self.tpr)
-        self.aucpr = metrics.auc(self.recall, self.precision)
+        # self.average_precision = (self.targets == 0).sum() / len(self.targets)
+        self.aucpr, _, _, self.aucroc, _, _ = od_metrics(self.scores, self.targets, split=True, n_splits=100)
         return
 
     def plot_precision_recall(self, savename):
@@ -181,7 +177,13 @@ class Model(object):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="autoencoder")
     parser.add_argument('--e', type=int, default=2, help="epochs (default 2)")
-    parser.add_argument("--dataset", type=str, default="linear", choices=["linear", "macho", "asas_sn", "toy", "ztf"], help="dataset name (default linear)")
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default="linear",
+        choices=["linear", "macho", "asas_sn", "toy", "ztf_transient", "ztf_stochastic", "ztf_periodic"],
+        help="dataset name (default linear)"
+    )
     parser.add_argument('--config', type=int, default=0, help="config number (default 0)")
     parser.add_argument('--device', type=str, default="cpu", help="device (default cpu)")
     args = parser.parse_args()
@@ -219,13 +221,13 @@ if __name__ == "__main__":
         dataset = ToyDataset(args, val_size=0.1, sl=64)
         outlier_class = [3, 4]
     elif args.dataset == "asas_sn":
-        trainloader, valloader, testloader = get_asas_sn_data_loaders(config["bs"], device)
+        trainloader, valloader, testloader = get_data_loaders(args.dataset, config["bs"], device)
         outlier_class = [8]
-    elif args.dataset == "ztf":
-        trainloader, valloader, testloader = get_data_loaders(config["bs"], device)
-        outlier_labels = load_json("../datasets/ztf/outlier_class.json")
+    elif "ztf" in args.dataset:
+        trainloader, valloader, testloader = get_data_loaders(args.dataset, config["bs"], device)
+        outlier_labels = load_json("../datasets/ztf/cl/transient/lab2out.json")
         outlier_labels = [key for key in outlier_labels if outlier_labels[key] == "outlier"]
-        lab2idx = load_json("../datasets/ztf/lab2idx.json")
+        lab2idx = load_json("../datasets/ztf/cl/transient/lab2idx.json")
         outlier_class = [int(lab2idx[lab]) for lab in outlier_labels]
 
     config["nin"] = trainloader.dataset.x[0].shape[1]
@@ -237,6 +239,13 @@ if __name__ == "__main__":
     torch.save(last_model, "models/od/{}/config_{}/last.pth".format(args.dataset, args.config))
     autoencoder.evaluate(testloader.dataset, valloader.dataset, outlier_class)
     plot_loss(loss, "figures/od/{}/config_{}/loss.png".format(args.dataset, args.config))
-    autoencoder.plot_precision_recall("figures/od/{}/config_{}/precision_recall.png".format(args.dataset, args.config))
-    autoencoder.plot_roc("figures/od/{}/config_{}/roc.png".format(args.dataset, args.config))
+    # autoencoder.plot_precision_recall("figures/od/{}/config_{}/precision_recall.png".format(args.dataset, args.config))
+    # autoencoder.plot_roc("figures/od/{}/config_{}/roc.png".format(args.dataset, args.config))
     autoencoder.plot_scores("figures/od/{}/config_{}/score.png".format(args.dataset, args.config), nbins=50)
+    data = dict(
+        aucpr=float(np.mean(autoencoder.aucpr)),
+        aucpr_std=float(np.std(autoencoder.aucpr)),
+        aucroc=float(np.mean(autoencoder.aucroc)),
+        aucroc_std=float(np.std(autoencoder.aucroc)),
+    )
+    save_yaml(data, f"files/od/{args.dataset}/config_{args.config}/metrics.yaml")
