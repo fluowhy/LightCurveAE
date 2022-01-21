@@ -1,4 +1,5 @@
 import argparse
+from importlib.metadata import files
 from tqdm import tqdm
 # from torch.utils.tensorboard import SummaryWriter
 
@@ -181,11 +182,12 @@ if __name__ == "__main__":
         "--dataset",
         type=str,
         default="linear",
-        choices=["linear", "macho", "asas_sn", "toy", "ztf_transient", "ztf_stochastic", "ztf_periodic"],
+        choices=["asas", "linear", "macho", "asas_sn", "toy", "ztf_transient", "ztf_stochastic", "ztf_periodic"],
         help="dataset name (default linear)"
     )
     parser.add_argument('--config', type=int, default=0, help="config number (default 0)")
     parser.add_argument('--device', type=str, default="cpu", help="device (default cpu)")
+    parser.add_argument('--oc', type=int, default=0, help="outlier class (default 0)")
     args = parser.parse_args()
     print(args)
 
@@ -215,6 +217,13 @@ if __name__ == "__main__":
     make_dir("files/od/{}/config_{}".format(args.dataset, args.config))
     make_dir("models/od/{}/config_{}".format(args.dataset, args.config))
 
+    models_dir = f"models/od/{args.dataset}/config_{args.config}/oc_{args.oc}"
+    figures_dir = f"figures/od/{args.dataset}/config_{args.config}/oc_{args.oc}"
+    files_dir = f"files/od/{args.dataset}/config_{args.config}/oc_{args.oc}"
+
+    make_dir(figures_dir)
+    make_dir(files_dir)
+    make_dir(models_dir)
 
     # dataset = LightCurveDataset(args.dataset, fold=True, bs=bs, device=device, eval=True)
     if args.dataset == "toy":
@@ -229,23 +238,29 @@ if __name__ == "__main__":
         outlier_labels = [key for key in outlier_labels if outlier_labels[key] == "outlier"]
         lab2idx = load_json("../datasets/ztf/cl/transient/lab2idx.json")
         outlier_class = [int(lab2idx[lab]) for lab in outlier_labels]
+    elif args.dataset == "asas":
+        outlier_class = [args.oc]
+        trainloader, valloader, testloader = get_data_loaders(args.dataset, config["bs"], device, args.oc)
+    elif args.dataset == "linear":
+        outlier_class = [args.oc]
+        trainloader, valloader, testloader = get_data_loaders(args.dataset, config["bs"], device, args.oc)
 
     config["nin"] = trainloader.dataset.x[0].shape[1]
 
     print(config)
     autoencoder = Model(config)
     loss, best_model, last_model = autoencoder.fit(trainloader, valloader)
-    torch.save(best_model, "models/od/{}/config_{}/best.pth".format(args.dataset, args.config))
-    torch.save(last_model, "models/od/{}/config_{}/last.pth".format(args.dataset, args.config))
+    torch.save(best_model, f"{models_dir}/best.pth")
+    torch.save(last_model, f"{models_dir}last.pth")
     autoencoder.evaluate(testloader.dataset, valloader.dataset, outlier_class)
-    plot_loss(loss, "figures/od/{}/config_{}/loss.png".format(args.dataset, args.config))
+    plot_loss(loss, f"{figures_dir}/loss.png")
     # autoencoder.plot_precision_recall("figures/od/{}/config_{}/precision_recall.png".format(args.dataset, args.config))
     # autoencoder.plot_roc("figures/od/{}/config_{}/roc.png".format(args.dataset, args.config))
-    autoencoder.plot_scores("figures/od/{}/config_{}/score.png".format(args.dataset, args.config), nbins=50)
+    autoencoder.plot_scores(f"{figures_dir}/score.png", nbins=50)
     data = dict(
         aucpr=float(np.mean(autoencoder.aucpr)),
         aucpr_std=float(np.std(autoencoder.aucpr)),
         aucroc=float(np.mean(autoencoder.aucroc)),
         aucroc_std=float(np.std(autoencoder.aucroc)),
     )
-    save_yaml(data, f"files/od/{args.dataset}/config_{args.config}/metrics.yaml")
+    save_yaml(data, f"{files_dir}/metrics.yaml")

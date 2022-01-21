@@ -12,6 +12,53 @@ from sklearn.metrics import auc
 import pandas as pd
 
 
+def get_linear_data(oc):
+    df = pd.read_csv("../datasets/linear/metadata_split_1.csv")
+    data = np.load("../datasets/linear/light_curves_pf.npz", allow_pickle=True)["light_curves"]
+
+    mask = df["split"] == "train"
+    x_train = [dat for dat, ma in zip(data, mask) if ma]
+    y_train = df["target"][mask].values
+
+    mask = df["split"] == "val"
+    x_val = [dat for dat, ma in zip(data, mask) if ma]
+    y_val = df["target"][mask].values
+
+    mask = df["split"] == "test"
+    x_test = [dat for dat, ma in zip(data, mask) if ma]
+    y_test = df["target"][mask].values
+    normalize_mag(x_train)
+    normalize_mag(x_test)
+    normalize_mag(x_val)
+    return x_train, x_val, x_test, y_train, y_val, y_test
+
+
+def get_asas_data(oc):
+    df = pd.read_csv("../datasets/asas/metadata_split_1.csv")
+    data = np.load("../datasets/asas/light_curves_pf_pro1.npz", allow_pickle=True)["light_curves"]
+    normalize_mag(data)
+
+    # data splitting
+    mask = df["split"] == "train"
+    x_train = [dat for dat, ma in zip(data, mask) if ma]
+    y_train = df["target"][mask].values
+    mask = df["split"] == "val"
+    x_val = [dat for dat, ma in zip(data, mask) if ma]
+    y_val = df["target"][mask].values
+    mask = df["split"] == "test"
+    x_test = [dat for dat, ma in zip(data, mask) if ma]
+    y_test = df["target"][mask].values
+
+    # od data removal
+    mask = y_train != oc
+    x_train = [dat for dat, ma in zip(data, mask) if ma]
+    y_train = y_train[mask]
+    mask = y_val != oc
+    x_val = [dat for dat, ma in zip(data, mask) if ma]
+    y_val = y_val[mask]
+    return x_train, x_val, x_test, y_train, y_val, y_test
+
+
 def normalize_mag(x):
     for xi in x:
         m, s = xi[:, 1].mean(), xi[:, 1].std()

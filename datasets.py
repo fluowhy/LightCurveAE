@@ -7,7 +7,10 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 import platform
 
-from utils import get_ztf_data, make_dir
+from utils import get_ztf_data
+from utils import get_asas_data
+from utils import get_linear_data
+from utils import make_dir
 from utils import save_json
 from utils import MyDataset
 
@@ -71,11 +74,15 @@ def load_data(device="cpu"):
     return trainset, valset, testset
 
 
-def get_data_loaders(dataset, batch_size, device):
+def get_data_loaders(dataset, batch_size, device, oc=None):
     if dataset == "asas_sn":
         pass
     elif "ztf" in dataset:
         x_train, x_val, x_test, y_train, y_val, y_test = get_ztf_data(dataset)
+    elif dataset == "asas":
+        x_train, x_val, x_test, y_train, y_val, y_test = get_asas_data(oc)
+    elif dataset == "linear":
+        x_train, x_val, x_test, y_train, y_val, y_test = get_linear_data(oc)
     trainset, valset, testset = get_datasets(x_train, x_val, x_test, y_train, y_val, y_test, device)
     trainloader = DataLoader(trainset, batch_size=int(batch_size), shuffle=True, collate_fn=pad_sequence_with_lengths)
     valloader = DataLoader(valset, batch_size=int(batch_size), shuffle=True, collate_fn=pad_sequence_with_lengths)
