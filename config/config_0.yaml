@@ -1,32 +1,18 @@
 # recurrent architecture
 arch: gru
 # batch size
-bs: 1024
-# training device
-d: cuda:1
+bs: 512
 # dropout
-do: 0.5
+do: 0.25
 # learning rate
-lr: 0.0001
+lr: 0.0005
 # recurrent network size
 nh: 96
 # latent space size
-nl: 8
+nl: 64
 # number of recurrent layers
 nlayers: 2
 # output size
 nout: 1
-# early stopping patience
-patience: 1000
-# number of repetitions
-rep: 5
 # weight decay weight
 wd: 0.0
-# folded light curves
-fold: false
-# max lr
-max_lr: 0.02
-# beta_r
-beta_r: 0.98
-# beta_e
-beta_e: 1.02
