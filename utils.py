@@ -12,6 +12,27 @@ from sklearn.metrics import auc
 import pandas as pd
 
 
+def get_asas_sn_data():
+    df = pd.read_csv("../datasets/asas_sn/metadata_2.csv")
+    data = np.load("../datasets/asas_sn/light_curves_2_pf.npz", allow_pickle=True)["light_curves"]
+
+    mask = df["split"] == "train"
+    x_train = [dat for dat, ma in zip(data, mask) if ma]
+    y_train = df["target"][mask].values
+
+    mask = df["split"] == "val"
+    x_val = [dat for dat, ma in zip(data, mask) if ma]
+    y_val = df["target"][mask].values
+
+    mask = df["split"] == "test"
+    x_test = [dat for dat, ma in zip(data, mask) if ma]
+    y_test = df["target"][mask].values
+    normalize_mag(x_train)
+    normalize_mag(x_test)
+    normalize_mag(x_val)
+    return x_train, x_val, x_test, y_train, y_val, y_test
+
+
 def get_linear_data(oc):
     df = pd.read_csv("../datasets/linear/metadata_split_1.csv")
     data = np.load("../datasets/linear/light_curves_pf.npz", allow_pickle=True)["light_curves"]

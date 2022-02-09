@@ -13,6 +13,7 @@ from utils import get_linear_data
 from utils import make_dir
 from utils import save_json
 from utils import MyDataset
+from utils import get_asas_sn_data
 
 
 def pad_sequence_with_lengths(data):
@@ -76,7 +77,7 @@ def load_data(device="cpu"):
 
 def get_data_loaders(dataset, batch_size, device, oc=None):
     if dataset == "asas_sn":
-        pass
+        x_train, x_val, x_test, y_train, y_val, y_test = get_asas_sn_data()
     elif "ztf" in dataset:
         x_train, x_val, x_test, y_train, y_val, y_test = get_ztf_data(dataset)
     elif dataset == "asas":
